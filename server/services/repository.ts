@@ -113,10 +113,11 @@ export class DocuZillaRepository {
     if (db) {
 
       const existingUsers = await db.select().from(users).limit(1);
-      let allDbUsers = existingUsers.length > 0 ? await db.select().from(users).orderBy(asc(users.id)) : [];
-      let allDbProjects = existingUsers.length > 0 ? await db.select().from(projects).orderBy(asc(projects.id)) : [];
+      const isFirstRunEmptyDb = existingUsers.length === 0;
+      let allDbUsers = !isFirstRunEmptyDb ? await db.select().from(users).orderBy(asc(users.id)) : [];
+      let allDbProjects = !isFirstRunEmptyDb ? await db.select().from(projects).orderBy(asc(projects.id)) : [];
 
-      if (existingUsers.length === 0) {
+      if (isFirstRunEmptyDb) {
         const [kerlin] = await db
           .insert(users)
           .values({
@@ -231,6 +232,7 @@ export class DocuZillaRepository {
 
       const existingDocs = await db.select().from(documents).limit(1);
       if (
+        isFirstRunEmptyDb &&
         existingDocs.length === 0 &&
         byCode.has('PRJ-2603') &&
         byCode.has('PRJ-2611') &&
@@ -717,7 +719,7 @@ export class DocuZillaRepository {
     return toPublicUser(u);
   }
 
-  static async listProjects(): Promise<Array<ProjectRow & { ownerName: string | null; docCount: number }>> {
+  static async listProjects(): Promise<Array<ProjectRow & { ownerName: string | null; docCount: number; pendingCount: number }>> {
     const allUsers = await this.listUsers();
     const userMap = new Map(allUsers.map((u) => [u.id, u]));
     const db = getDb();
@@ -729,11 +731,13 @@ export class DocuZillaRepository {
     return projs.map((p) => {
       const projDocs = docs.filter((d) => d.projectId === p.id);
       const realBytes = projDocs.reduce((sum, d) => sum + d.sizeBytes, 0);
+      const pendingCount = projDocs.filter((d) => d.approvalStatus === 'pending').length;
       return {
         ...p,
         storageUsedBytes: realBytes,
         ownerName: p.ownerId ? userMap.get(p.ownerId)?.name ?? null : null,
         docCount: projDocs.length,
+        pendingCount,
       };
     });
   }
@@ -1341,7 +1345,7 @@ export class DocuZillaRepository {
         subMetrics: [
           { value: `${aiCoveragePct}%`, label: 'AI Summarized', badge: 'up' as const },
           { value: String(allEvents.length), label: 'Audit Events', badge: 'up' as const },
-          { value: String(allAiMsgs.length), label: 'AI Queries', badge: 'warn' as const },
+          { value: String(allAiMsgs.filter((m) => m.role === 'user').length), label: 'AI Queries', badge: 'warn' as const },
           { value: String(activeProjectsCount), label: 'Active Rooms', badge: 'up' as const },
         ],
       },

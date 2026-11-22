@@ -104,7 +104,7 @@ function resolveChatCompletionsEndpoint(rawBaseUrl: string): string {
 
   if (/ais-dev-.*\.run\.app$/i.test(parsed.hostname) || /\/api\/documents\b/i.test(parsed.pathname)) {
     throw new Error(
-      `OPENAI_BASE_URL in Secrets points to this app's URL (${parsed.hostname}${parsed.pathname}) instead of your AI provider. Please update OPENAI_BASE_URL in Settings > Secrets to your AI host (e.g. https://ai.sumopod.com).`,
+      `OPENAI_BASE_URL in Secrets points to this app's URL (${parsed.hostname}${parsed.pathname}) instead of your AI provider. Please update OPENAI_BASE_URL in Settings > Secrets to your AI provider host (e.g. https://api.openai.com/v1).`,
     );
   }
 
@@ -120,31 +120,14 @@ function resolveChatCompletionsEndpoint(rawBaseUrl: string): string {
   return parsed.toString();
 }
 
-const DEFAULT_OPENAI_BASE_URL = 'https://ai.sumopod.com';
-
 function getConfiguredBaseUrl(): string {
-  const candidates = [
-    process.env.OPENAI_BASE_URL,
-    process.env.OPENAI_API_BASE,
-    process.env.OPENAI_HOST,
-    process.env.OPENAI_API_HOST,
-  ]
-    .map((v) => v?.trim())
-    .filter((v): v is string => Boolean(v));
-
-  const validExternal = candidates.find((v) => {
-    if (/ais-dev-.*\.run\.app/i.test(v) || /\/api\/documents\b/i.test(v)) {
-      return false;
-    }
-    try {
-      resolveChatCompletionsEndpoint(v);
-      return true;
-    } catch {
-      return false;
-    }
-  });
-
-  return validExternal || DEFAULT_OPENAI_BASE_URL;
+  return (
+    process.env.OPENAI_BASE_URL?.trim() ||
+    process.env.OPENAI_API_BASE?.trim() ||
+    process.env.OPENAI_HOST?.trim() ||
+    process.env.OPENAI_API_HOST?.trim() ||
+    ''
+  );
 }
 
 export function isAiConfigured(): boolean {

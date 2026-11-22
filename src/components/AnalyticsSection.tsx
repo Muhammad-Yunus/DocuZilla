@@ -229,8 +229,16 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               <span className="text-[28px] sm:text-[31px] font-normal tracking-tight text-slate-900 tabular-nums leading-none">
                 {uploads.headlineValue}
               </span>
-              <span className="w-5 h-5 rounded-full bg-[#22C55E] text-white inline-flex items-center justify-center shrink-0">
-                <ArrowUpRight className="w-3 h-3" strokeWidth={2.5} />
+              <span
+                className={`w-5 h-5 rounded-full text-white inline-flex items-center justify-center shrink-0 ${
+                  uploads.deltaDirection === 'down' ? 'bg-[#EF4444]' : 'bg-[#22C55E]'
+                }`}
+              >
+                {uploads.deltaDirection === 'down' ? (
+                  <ArrowDownRight className="w-3 h-3" strokeWidth={2.5} />
+                ) : (
+                  <ArrowUpRight className="w-3 h-3" strokeWidth={2.5} />
+                )}
               </span>
             </div>
           </div>
@@ -270,8 +278,16 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               <span className="text-[28px] sm:text-[31px] font-normal tracking-tight text-slate-900 tabular-nums leading-none">
                 {processed.headlineValue}
               </span>
-              <span className="w-5 h-5 rounded-full bg-[#22C55E] text-white inline-flex items-center justify-center shrink-0">
-                <ArrowUpRight className="w-3 h-3" strokeWidth={2.5} />
+              <span
+                className={`w-5 h-5 rounded-full text-white inline-flex items-center justify-center shrink-0 ${
+                  processed.deltaDirection === 'down' ? 'bg-[#EF4444]' : 'bg-[#22C55E]'
+                }`}
+              >
+                {processed.deltaDirection === 'down' ? (
+                  <ArrowDownRight className="w-3 h-3" strokeWidth={2.5} />
+                ) : (
+                  <ArrowUpRight className="w-3 h-3" strokeWidth={2.5} />
+                )}
               </span>
             </div>
           </div>
@@ -311,8 +327,16 @@ export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
               <span className="text-[28px] sm:text-[31px] font-normal tracking-tight text-slate-900 tabular-nums leading-none">
                 {discrepancies.headlineValue}
               </span>
-              <span className="w-5 h-5 rounded-full bg-[#EF4444] text-white inline-flex items-center justify-center shrink-0">
-                <ArrowDownRight className="w-3 h-3" strokeWidth={2.5} />
+              <span
+                className={`w-5 h-5 rounded-full text-white inline-flex items-center justify-center shrink-0 ${
+                  discrepancies.deltaDirection === 'down' ? 'bg-[#EF4444]' : 'bg-[#22C55E]'
+                }`}
+              >
+                {discrepancies.deltaDirection === 'down' ? (
+                  <ArrowDownRight className="w-3 h-3" strokeWidth={2.5} />
+                ) : (
+                  <ArrowUpRight className="w-3 h-3" strokeWidth={2.5} />
+                )}
               </span>
             </div>
           </div>
