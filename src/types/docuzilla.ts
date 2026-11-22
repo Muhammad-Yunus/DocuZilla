@@ -100,11 +100,13 @@ export interface DashboardSummary {
     totalDocuments: number;
     totalDocumentsDelta: string;
     dataRoomSizeGb: number;
+    dataRoomSizeBytes: number;
+    dataRoomSizeFormatted: string;
     dataRoomSizeDelta: string;
     pendingReviews: number;
   };
   analytics: Record<string, AnalyticsCardData>;
-  storageBackend: 'rustfs-s3' | 'rustfs-local-vault';
+  storageBackend: 'rustfs-s3' | 'rustfs-local-vault' | '';
   storageBucket: string;
 }
 

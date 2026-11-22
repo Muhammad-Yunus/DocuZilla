@@ -84,11 +84,13 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  const greetingName = currentUser ? currentUser.name.split(' ')[0] : 'Abhishek';
-  const displayProfileName = currentUser ? currentUser.name : 'Kerlin kors';
+  const greetingText = currentUser
+    ? `Welcome back, ${currentUser.name.split(' ')[0]}`
+    : 'Welcome to DocuZilla';
+  const displayProfileName = currentUser ? currentUser.name : 'Sign In';
   const displayProfileRole = currentUser
     ? currentUser.role.charAt(0).toUpperCase() + currentUser.role.slice(1)
-    : 'Admin';
+    : 'Guest Session';
 
   const hasSearchResults =
     searchResults.projects.length > 0 ||
@@ -404,7 +406,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
       {/* Hero Editorial Headline */}
       <div className="relative z-20 px-5 sm:px-8 lg:px-10 pt-7 sm:pt-9 pb-7 sm:pb-10 max-w-xl">
         <p className="text-[13px] sm:text-[13.5px] font-normal text-white/85 mb-2.5 tracking-[-0.01em]">
-          Welcome back, {greetingName} <span aria-hidden="true">👋</span>
+          {greetingText} <span aria-hidden="true">👋</span>
         </p>
         <h1 className="text-[34px] sm:text-[42px] lg:text-[46px] font-light tracking-[-0.025em] leading-[1.09] text-white mb-4">
           Your Data,
@@ -521,7 +523,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
               </div>
               <div className="flex items-baseline gap-2 mt-0.5">
                 <span className="text-[20px] font-normal text-white tabular-nums tracking-tight leading-none whitespace-nowrap">
-                  {summary.kpis.dataRoomSizeGb} GB
+                  {summary.kpis.dataRoomSizeFormatted || `${summary.kpis.dataRoomSizeGb} GB`}
                 </span>
                 <span className="text-[10.5px] font-medium text-[#86EFAC] tabular-nums">
                   ↑ {summary.kpis.dataRoomSizeDelta}

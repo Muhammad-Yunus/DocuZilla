@@ -14,62 +14,31 @@ import type {
   WorkspaceTab,
 } from './types/docuzilla.ts';
 
-const INITIAL_SUMMARY: DashboardSummary = {
+const EMPTY_SUMMARY: DashboardSummary = {
   kpis: {
-    activeProjects: 24,
-    activeProjectsDelta: '12%',
-    totalUsers: 186,
-    totalUsersDelta: '8%',
-    totalDocuments: 8642,
-    totalDocumentsDelta: '18%',
-    dataRoomSizeGb: 428,
-    dataRoomSizeDelta: '11%',
-    pendingReviews: 17,
+    activeProjects: 0,
+    activeProjectsDelta: '0%',
+    totalUsers: 0,
+    totalUsersDelta: '0%',
+    totalDocuments: 0,
+    totalDocumentsDelta: '0%',
+    dataRoomSizeGb: 0,
+    dataRoomSizeBytes: 0,
+    dataRoomSizeFormatted: '0 B',
+    dataRoomSizeDelta: '0%',
+    pendingReviews: 0,
   },
   analytics: {},
-  storageBackend: 'rustfs-local-vault',
-  storageBucket: 'docuzilla-dataroom',
+  storageBackend: '',
+  storageBucket: '',
 };
 
-const INITIAL_AI_MESSAGES: AiMessage[] = [
-  {
-    id: 1,
-    userId: null,
-    documentId: null,
-    role: 'assistant',
-    mode: 'GPT-4o',
-    content: 'Please upload a PDF for data processing.',
-    attachmentName: null,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 2,
-    userId: null,
-    documentId: null,
-    role: 'user',
-    mode: 'GPT-4o',
-    content: "Sure, I'm uploading the document now. Let me know what's next.",
-    attachmentName: 'Q3_GL_Variance_Report.pdf',
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 3,
-    userId: null,
-    documentId: null,
-    role: 'assistant',
-    mode: 'GPT-4o',
-    content: 'Thank you! Processing your file now.',
-    attachmentName: null,
-    createdAt: new Date().toISOString(),
-  },
-];
-
 export default function App() {
-  const [summary, setSummary] = useState<DashboardSummary>(INITIAL_SUMMARY);
+  const [summary, setSummary] = useState<DashboardSummary>(EMPTY_SUMMARY);
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [projects, setProjects] = useState<ProjectItem[]>([]);
   const [users, setUsers] = useState<PublicUser[]>([]);
-  const [aiMessages, setAiMessages] = useState<AiMessage[]>(INITIAL_AI_MESSAGES);
+  const [aiMessages, setAiMessages] = useState<AiMessage[]>([]);
 
   const [currentUser, setCurrentUser] = useState<PublicUser | null>(null);
   const [hasAdminAccount, setHasAdminAccount] = useState<boolean>(true);
@@ -96,9 +65,7 @@ export default function App() {
     const safeMessages = Array.isArray(aiRes?.messages)
       ? aiRes.messages.filter((m): m is AiMessage => Boolean(m && typeof m === 'object' && typeof m.role === 'string'))
       : [];
-    if (safeMessages.length > 0) {
-      setAiMessages(safeMessages);
-    }
+    setAiMessages(safeMessages);
     setHasAdminAccount(Boolean(authRes?.hasAdminAccount));
     setCurrentUser(authRes?.currentUser ?? null);
   }, []);

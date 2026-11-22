@@ -153,16 +153,19 @@ export const AiAssistantCard: React.FC<AiAssistantCardProps> = ({
     }
   };
 
-  const formatMsgTime = (iso: string, index: number) => {
-    if (index === 0) return '10:59';
-    if (index === 2) return '11:00';
+  const formatMsgTime = (iso: string) => {
     try {
       const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return '';
       return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
     } catch {
       return '';
     }
   };
+
+  const safeMessages = (Array.isArray(messages) ? messages : []).filter(
+    (msg): msg is AiMessage => Boolean(msg && typeof msg === 'object' && typeof msg.role === 'string'),
+  );
 
   return (
     <aside className="bg-white rounded-[22px] p-5 sm:p-6 shadow-[0_2px_16px_rgba(15,23,42,0.03)] border border-slate-100/80 flex flex-col justify-between h-full min-h-[460px]">
@@ -187,16 +190,28 @@ export const AiAssistantCard: React.FC<AiAssistantCardProps> = ({
         ref={scrollRef}
         className="flex-1 overflow-y-auto thin-scrollbar pr-1 space-y-3 py-1 max-h-[340px] lg:max-h-[360px]"
       >
-        {(Array.isArray(messages) ? messages : [])
-          .filter((msg): msg is AiMessage => Boolean(msg && typeof msg === 'object' && typeof msg.role === 'string'))
-          .map((msg, idx) => {
-            const isAssistant = msg.role === 'assistant';
-            const showTimestamp = idx === 0 || idx === 2 || idx > 2;
-            return (
-              <div key={msg.id ?? `ai-msg-${idx}`} className="space-y-1.5">
-              {showTimestamp && (
+        {safeMessages.length === 0 && !sending && (
+          <div className="h-full min-h-[180px] flex flex-col items-center justify-center text-center px-4 py-6 rounded-2xl bg-slate-50/70 border border-dashed border-slate-200">
+            <div className="w-9 h-9 rounded-full bg-white border border-slate-200 flex items-center justify-center mb-2.5">
+              <Brain className="w-4 h-4 text-[#3B66F5]" strokeWidth={1.7} />
+            </div>
+            <div className="text-xs font-medium text-slate-700">
+              Ask about Data Room projects or PDFs
+            </div>
+            <p className="text-[11px] text-slate-400 mt-1 max-w-[230px] leading-relaxed">
+              Attach a PDF or ask directly about uploaded documents, approval queues, or audit metrics in PostgreSQL.
+            </p>
+          </div>
+        )}
+
+        {safeMessages.map((msg, idx) => {
+          const isAssistant = msg.role === 'assistant';
+          const timeLabel = formatMsgTime(msg.createdAt);
+          return (
+            <div key={msg.id ?? `ai-msg-${idx}`} className="space-y-1.5">
+              {timeLabel && (
                 <div className="text-[10.5px] text-slate-400 tabular-nums">
-                  {formatMsgTime(msg.createdAt, idx)}
+                  {timeLabel}
                 </div>
               )}
 

@@ -95,7 +95,7 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const uploadFileInputRef = React.useRef<HTMLInputElement>(null);
   const [uploadTitle, setUploadTitle] = useState('');
-  const [uploadProjectId, setUploadProjectId] = useState<number>(projects[0]?.id || 1);
+  const [uploadProjectId, setUploadProjectId] = useState<number>(projects[0]?.id ?? 0);
   const [uploadCategory, setUploadCategory] = useState('Financial Statement');
   const [customApproverId, setCustomApproverId] = useState<number | ''>('');
   const [submitImmediately, setSubmitImmediately] = useState(true);
@@ -146,6 +146,10 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
     e.preventDefault();
     if (!currentUser) {
       onRequireAuth();
+      return;
+    }
+    if (!uploadProjectId) {
+      setFeedback({ type: 'error', text: 'Create or select a Data Room Project before uploading.' });
       return;
     }
     if (!uploadFile) {
@@ -1129,40 +1133,54 @@ export const WorkspaceModal: React.FC<WorkspaceModalProps> = ({
           )}
 
           {/* TAB 5: AUDIT ANALYTICS DRILLDOWN */}
-          {activeTab === 'analytics' && (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white rounded-2xl p-5 border border-slate-200/80 space-y-2">
-                <div className="text-xs text-slate-500">On-Time Month Closures</div>
-                <div className="text-2xl font-semibold text-slate-900 tabular-nums">
-                  {summary.analytics.month_closures?.headlineValue || '77,24%'}
+          {activeTab === 'analytics' && (() => {
+            const approvedDocsCount = documents.filter((d) => d.approvalStatus === 'approved').length;
+            const pendingDocsCount = documents.filter((d) => d.approvalStatus === 'pending').length;
+            const rejectedDocsCount = documents.filter((d) => d.approvalStatus === 'rejected').length;
+            const aiSummarizedDocsCount = documents.filter((d) => Boolean(d.aiSummary?.trim())).length;
+            const discrepancyValues = documents.map((d) => {
+              const num = parseFloat(String(d.discrepancyRate || '0').replace('%', '').trim());
+              return Number.isFinite(num) ? Math.max(0, num) : 0;
+            });
+            const maxDiscrepancy =
+              discrepancyValues.length > 0 ? Math.max(...discrepancyValues) : 0;
+
+            return (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 space-y-2">
+                  <div className="text-xs text-slate-500">Approval Completion Rate</div>
+                  <div className="text-2xl font-semibold text-slate-900 tabular-nums">
+                    {summary.analytics.month_closures?.headlineValue || '0,00%'}
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {approvedDocsCount} approved, {pendingDocsCount} pending review, and{' '}
+                    {rejectedDocsCount} rejected across {documents.length} total documents in{' '}
+                    {projects.length} projects.
+                  </p>
                 </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  88 closed ledgers vs. 19 open sub-ledgers across active Q3/Q4 data rooms. 84/0
-                  on-time SLA compliance.
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl p-5 border border-slate-200/80 space-y-2">
-                <div className="text-xs text-slate-500">Audit Discrepancies</div>
-                <div className="text-2xl font-semibold text-slate-900 tabular-nums">
-                  {summary.analytics.discrepancies?.headlineValue || '13,78%'}
+                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 space-y-2">
+                  <div className="text-xs text-slate-500">Average Audit Discrepancy</div>
+                  <div className="text-2xl font-semibold text-slate-900 tabular-nums">
+                    {summary.analytics.discrepancies?.headlineValue || '0,00%'}
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    Computed from {documents.length} persisted ledger records (peak recorded
+                    discrepancy: {maxDiscrepancy.toFixed(2)}%).
+                  </p>
                 </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  Automated PDF cross-footing and variance checks across 2.9K–11.5K line items over
-                  the trailing 7 days.
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl p-5 border border-slate-200/80 space-y-2">
-                <div className="text-xs text-slate-500">Data Room Throughput</div>
-                <div className="text-2xl font-semibold text-slate-900 tabular-nums">
-                  {summary.kpis.dataRoomSizeGb} GB
+                <div className="bg-white rounded-2xl p-5 border border-slate-200/80 space-y-2">
+                  <div className="text-xs text-slate-500">Data Room Storage &amp; AI Coverage</div>
+                  <div className="text-2xl font-semibold text-slate-900 tabular-nums">
+                    {summary.kpis.dataRoomSizeFormatted || `${summary.kpis.dataRoomSizeGb} GB`}
+                  </div>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    {aiSummarizedDocsCount} of {documents.length} documents AI-summarized · Stored
+                    in RustFS bucket <span className="font-mono">{summary.storageBucket || 'docuzilla'}</span>.
+                  </p>
                 </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  74% retrieval efficiency and 56% automated account syncs backed by RustFS object
-                  storage.
-                </p>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
       </div>
     </div>

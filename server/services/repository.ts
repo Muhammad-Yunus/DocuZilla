@@ -6,7 +6,6 @@ import {
   documents,
   approvalEvents,
   aiConversations,
-  analyticsSnapshots,
   type UserRow,
   type ProjectRow,
   type DocumentRow,
@@ -32,15 +31,18 @@ export interface ApprovalEventWithActor extends ApprovalEventRow {
   actorRole: string;
 }
 
-// Baseline historical volume so KPI counters match enterprise archive scale
-// while reacting live to newly created projects, users, uploads, and approvals.
-const BASELINE = {
-  projectsOffset: 19, // 5 seeded + 19 = 24
-  usersOffset: 180,   // 6 seeded + 180 = 186
-  docsOffset: 8634,   // 8 seeded + 8634 = 8,642
-  sizeGbOffset: 428,
-  pendingOffset: 14,  // 3 seeded pending + 14 = 17
-};
+function formatBytesLabel(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+function formatCommaPercent(pct: number): string {
+  const clamped = Math.max(0, Math.min(100, Number.isFinite(pct) ? pct : 0));
+  return `${clamped.toFixed(2).replace('.', ',')}%`;
+}
 
 // In-memory store used automatically if PostgreSQL is not yet configured in environment
 interface MemoryStore {
@@ -51,13 +53,6 @@ interface MemoryStore {
   documents: DocumentRow[];
   approvalEvents: ApprovalEventRow[];
   aiConversations: AiConversationRow[];
-  analytics: Array<{
-    metricKey: string;
-    headlineValue: string;
-    deltaDirection: string;
-    seriesJson: string;
-    subMetricsJson: string | null;
-  }>;
 }
 
 const mem: MemoryStore = {
@@ -74,96 +69,11 @@ const mem: MemoryStore = {
   documents: [],
   approvalEvents: [],
   aiConversations: [],
-  analytics: [],
 };
 
 function toPublicUser(u: UserRow): PublicUser {
   const { passwordHash: _omit, ...rest } = u;
   return rest;
-}
-
-function getDefaultAnalyticsSeed() {
-  return [
-    {
-      metricKey: 'document_uploads',
-      headlineValue: '72,52%',
-      deltaDirection: 'up',
-      seriesJson: JSON.stringify({
-        minLabel: '15.6K',
-        maxLabel: '17K',
-        bars: [22, 34, 42, 38, 52, 64, 72, 85, 78, 92, 80, 68, 76, 62, 54, 48, 58, 46, 36, 42, 34, 28],
-      }),
-      subMetricsJson: null,
-    },
-    {
-      metricKey: 'data_processed',
-      headlineValue: '61,23%',
-      deltaDirection: 'up',
-      seriesJson: JSON.stringify({
-        minLabel: '183 GB',
-        maxLabel: '240 GB',
-        bars: [18, 28, 36, 48, 58, 74, 88, 92, 84, 76, 82, 74, 68, 62, 56, 48, 42, 38, 32, 26, 22, 18],
-      }),
-      subMetricsJson: null,
-    },
-    {
-      metricKey: 'discrepancies',
-      headlineValue: '13,78%',
-      deltaDirection: 'down',
-      seriesJson: JSON.stringify({
-        minLabel: '2.9K',
-        maxLabel: '11.5K',
-        bars: [32, 46, 58, 76, 84, 92, 82, 74, 68, 72, 64, 58, 54, 46, 40, 34, 30, 26, 22, 18, 16, 14],
-      }),
-      subMetricsJson: null,
-    },
-    {
-      metricKey: 'month_closures',
-      headlineValue: '77,24%',
-      deltaDirection: 'up',
-      seriesJson: JSON.stringify({
-        bars: [
-          10, 18, 32, 16, 42, 26, 44, 58, 76, 62, 34, 88, 66, 48, 36, 68, 84, 94, 82, 72,
-          12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-        ],
-        redIndices: [8, 11],
-        pins: [
-          { index: 4, type: 'up', label: 'Q1 Timely +12%' },
-          { index: 11, type: 'down', label: 'Variance spike -4.2%' },
-          { index: 19, type: 'up', label: 'Close velocity +18%' },
-        ],
-      }),
-      subMetricsJson: JSON.stringify([
-        { value: '88', label: 'Closed', badge: 'up' },
-        { value: '19', label: 'Open', badge: 'alert' },
-        { value: '19/5', label: 'Timely', badge: 'warn' },
-        { value: '84/0', label: 'On Time', badge: 'up' },
-      ]),
-    },
-    {
-      metricKey: 'usage_rate',
-      headlineValue: '46,36%',
-      deltaDirection: 'up',
-      seriesJson: JSON.stringify({
-        bars: [
-          12, 22, 18, 28, 14, 34, 24, 46, 62, 84, 52, 74, 42, 24, 38, 48, 66, 78, 92, 68,
-          12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12,
-        ],
-        redIndices: [9, 13],
-        pins: [
-          { index: 6, type: 'up', label: 'Sync throughput +14%' },
-          { index: 13, type: 'down', label: 'Retry threshold' },
-          { index: 19, type: 'up', label: 'Retrieval peak +21%' },
-        ],
-      }),
-      subMetricsJson: JSON.stringify([
-        { value: '56%', label: 'Syncs Accounts', badge: 'up' },
-        { value: '11%', label: 'Auto Send', badge: 'alert' },
-        { value: '32%', label: 'Manual Send', badge: 'warn' },
-        { value: '74%', label: 'Retrieval', badge: 'up' },
-      ]),
-    },
-  ];
 }
 
 export function makeSamplePdfBuffer(title: string, projectCode: string, summaryText: string): Buffer {
@@ -201,10 +111,6 @@ export class DocuZillaRepository {
   static async seedIfEmpty(): Promise<void> {
     const db = getDb();
     if (db) {
-      // Always ensure analytics snapshots exist (safe idempotent backfill)
-      for (const snap of getDefaultAnalyticsSeed()) {
-        await db.insert(analyticsSnapshots).values(snap).onConflictDoNothing();
-      }
 
       const existingUsers = await db.select().from(users).limit(1);
       let allDbUsers = existingUsers.length > 0 ? await db.select().from(users).orderBy(asc(users.id)) : [];
@@ -306,11 +212,11 @@ export class DocuZillaRepository {
         allDbProjects = await db
           .insert(projects)
           .values([
-            { name: 'FY26 Q3 Consolidated Close', code: 'PRJ-2603', department: 'Financial Controls', status: 'active', ownerId: elena.id, storageUsedBytes: 142_000_000 },
-            { name: 'Apex Holdings Series C Data Room', code: 'PRJ-2611', department: 'M&A Data Room', status: 'active', ownerId: marcus.id, storageUsedBytes: 98_500_000 },
-            { name: 'APAC Subsidiary Tax Audit', code: 'PRJ-2614', department: 'Treasury & Tax', status: 'audit', ownerId: elena.id, storageUsedBytes: 64_200_000 },
-            { name: 'Vendor Reconciliation Ledger', code: 'PRJ-2618', department: 'Financial Controls', status: 'active', ownerId: kerlin.id, storageUsedBytes: 51_000_000 },
-            { name: 'SOC2 Type II Compliance Vault', code: 'PRJ-2620', department: 'Executive Audit', status: 'active', ownerId: marcus.id, storageUsedBytes: 72_300_000 },
+            { name: 'FY26 Q3 Consolidated Close', code: 'PRJ-2603', department: 'Financial Controls', status: 'active', ownerId: elena.id, storageUsedBytes: 0 },
+            { name: 'Apex Holdings Series C Data Room', code: 'PRJ-2611', department: 'M&A Data Room', status: 'active', ownerId: marcus.id, storageUsedBytes: 0 },
+            { name: 'APAC Subsidiary Tax Audit', code: 'PRJ-2614', department: 'Treasury & Tax', status: 'audit', ownerId: elena.id, storageUsedBytes: 0 },
+            { name: 'Vendor Reconciliation Ledger', code: 'PRJ-2618', department: 'Financial Controls', status: 'active', ownerId: kerlin.id, storageUsedBytes: 0 },
+            { name: 'SOC2 Type II Compliance Vault', code: 'PRJ-2620', department: 'Executive Audit', status: 'active', ownerId: marcus.id, storageUsedBytes: 0 },
           ])
           .returning();
       }
@@ -322,36 +228,6 @@ export class DocuZillaRepository {
       const marcusUser = byEmail.get('marcus.vance@docuzilla.io') || elenaUser;
       const nadiaUser = byEmail.get('nadia.tan@docuzilla.io') || abhishekUser;
       const davidUser = byEmail.get('david.chen@docuzilla.io') || abhishekUser;
-
-      const existingAi = await db.select().from(aiConversations).limit(1);
-      if (existingAi.length === 0 && abhishekUser) {
-        await db.insert(aiConversations).values([
-          {
-            userId: abhishekUser.id,
-            documentId: null,
-            role: 'assistant',
-            mode: 'GPT-4o',
-            content: 'Please upload a PDF for data processing.',
-            attachmentName: null,
-          },
-          {
-            userId: abhishekUser.id,
-            documentId: null,
-            role: 'user',
-            mode: 'GPT-4o',
-            content: "Sure, I'm uploading the document now. Let me know what's next.",
-            attachmentName: 'Q3_GL_Variance_Report.pdf',
-          },
-          {
-            userId: abhishekUser.id,
-            documentId: null,
-            role: 'assistant',
-            mode: 'GPT-4o',
-            content: 'Thank you! Processing your file now.',
-            attachmentName: null,
-          },
-        ]);
-      }
 
       const existingDocs = await db.select().from(documents).limit(1);
       if (
@@ -603,11 +479,11 @@ export class DocuZillaRepository {
     };
     mem.users.push(kerlin, elena, marcus, abhishek, nadia, david);
 
-    const p1: ProjectRow = { id: mem.nextIds.projects++, name: 'FY26 Q3 Consolidated Close', code: 'PRJ-2603', department: 'Financial Controls', status: 'active', ownerId: elena.id, storageUsedBytes: 142_000_000, createdAt: now };
-    const p2: ProjectRow = { id: mem.nextIds.projects++, name: 'Apex Holdings Series C Data Room', code: 'PRJ-2611', department: 'M&A Data Room', status: 'active', ownerId: marcus.id, storageUsedBytes: 98_500_000, createdAt: now };
-    const p3: ProjectRow = { id: mem.nextIds.projects++, name: 'APAC Subsidiary Tax Audit', code: 'PRJ-2614', department: 'Treasury & Tax', status: 'audit', ownerId: elena.id, storageUsedBytes: 64_200_000, createdAt: now };
-    const p4: ProjectRow = { id: mem.nextIds.projects++, name: 'Vendor Reconciliation Ledger', code: 'PRJ-2618', department: 'Financial Controls', status: 'active', ownerId: kerlin.id, storageUsedBytes: 51_000_000, createdAt: now };
-    const p5: ProjectRow = { id: mem.nextIds.projects++, name: 'SOC2 Type II Compliance Vault', code: 'PRJ-2620', department: 'Executive Audit', status: 'active', ownerId: marcus.id, storageUsedBytes: 72_300_000, createdAt: now };
+    const p1: ProjectRow = { id: mem.nextIds.projects++, name: 'FY26 Q3 Consolidated Close', code: 'PRJ-2603', department: 'Financial Controls', status: 'active', ownerId: elena.id, storageUsedBytes: 0, createdAt: now };
+    const p2: ProjectRow = { id: mem.nextIds.projects++, name: 'Apex Holdings Series C Data Room', code: 'PRJ-2611', department: 'M&A Data Room', status: 'active', ownerId: marcus.id, storageUsedBytes: 0, createdAt: now };
+    const p3: ProjectRow = { id: mem.nextIds.projects++, name: 'APAC Subsidiary Tax Audit', code: 'PRJ-2614', department: 'Treasury & Tax', status: 'audit', ownerId: elena.id, storageUsedBytes: 0, createdAt: now };
+    const p4: ProjectRow = { id: mem.nextIds.projects++, name: 'Vendor Reconciliation Ledger', code: 'PRJ-2618', department: 'Financial Controls', status: 'active', ownerId: kerlin.id, storageUsedBytes: 0, createdAt: now };
+    const p5: ProjectRow = { id: mem.nextIds.projects++, name: 'SOC2 Type II Compliance Vault', code: 'PRJ-2620', department: 'Executive Audit', status: 'active', ownerId: marcus.id, storageUsedBytes: 0, createdAt: now };
     mem.projects.push(p1, p2, p3, p4, p5);
 
     const sampleDocsSpec = [
@@ -677,41 +553,6 @@ export class DocuZillaRepository {
         });
       }
     }
-
-    mem.analytics = getDefaultAnalyticsSeed();
-
-    mem.aiConversations.push(
-      {
-        id: mem.nextIds.aiConversations++,
-        userId: abhishek.id,
-        documentId: null,
-        role: 'assistant',
-        mode: 'GPT-4o',
-        content: 'Please upload a PDF for data processing.',
-        attachmentName: null,
-        createdAt: now,
-      },
-      {
-        id: mem.nextIds.aiConversations++,
-        userId: abhishek.id,
-        documentId: null,
-        role: 'user',
-        mode: 'GPT-4o',
-        content: "Sure, I'm uploading the document now. Let me know what's next.",
-        attachmentName: 'Q3_GL_Variance_Report.pdf',
-        createdAt: now,
-      },
-      {
-        id: mem.nextIds.aiConversations++,
-        userId: abhishek.id,
-        documentId: null,
-        role: 'assistant',
-        mode: 'GPT-4o',
-        content: 'Thank you! Processing your file now.',
-        attachmentName: null,
-        createdAt: now,
-      },
-    );
   }
 
   static async listUsers(): Promise<PublicUser[]> {
@@ -885,11 +726,16 @@ export class DocuZillaRepository {
       : [...mem.projects].sort((a, b) => b.id - a.id);
     const docs = db ? await db.select().from(documents) : mem.documents;
 
-    return projs.map((p) => ({
-      ...p,
-      ownerName: p.ownerId ? userMap.get(p.ownerId)?.name ?? null : null,
-      docCount: docs.filter((d) => d.projectId === p.id).length,
-    }));
+    return projs.map((p) => {
+      const projDocs = docs.filter((d) => d.projectId === p.id);
+      const realBytes = projDocs.reduce((sum, d) => sum + d.sizeBytes, 0);
+      return {
+        ...p,
+        storageUsedBytes: realBytes,
+        ownerName: p.ownerId ? userMap.get(p.ownerId)?.name ?? null : null,
+        docCount: projDocs.length,
+      };
+    });
   }
 
   static async createProject(input: {
@@ -1318,43 +1164,202 @@ export class DocuZillaRepository {
   }
 
   static async getDashboardSummary() {
-    const allUsers = await this.listUsers();
-    const allProjects = await this.listProjects();
-    const allDocs = await this.listDocuments();
     const db = getDb();
-    const snaps = db ? await db.select().from(analyticsSnapshots) : mem.analytics;
+    const [allUsers, allProjects, allDocs, allEvents, allAiMsgs] = await Promise.all([
+      this.listUsers(),
+      this.listProjects(),
+      this.listDocuments(),
+      db ? db.select().from(approvalEvents).orderBy(asc(approvalEvents.createdAt)) : Promise.resolve([...mem.approvalEvents]),
+      db ? db.select().from(aiConversations).orderBy(asc(aiConversations.createdAt)) : Promise.resolve([...mem.aiConversations]),
+    ]);
 
+    const totalDocs = allDocs.length;
+    const totalBytes = allDocs.reduce((acc, d) => acc + d.sizeBytes, 0);
     const pendingCount = allDocs.filter((d) => d.approvalStatus === 'pending').length;
-    const extraBytes = allDocs.slice(0, Math.max(0, allDocs.length - 8)).reduce((acc, d) => acc + d.sizeBytes, 0);
-    const extraGb = Math.round(extraBytes / (1024 * 1024 * 1024));
+    const approvedCount = allDocs.filter((d) => d.approvalStatus === 'approved').length;
+    const rejectedCount = allDocs.filter((d) => d.approvalStatus === 'rejected').length;
+    const activeProjectsCount = allProjects.filter((p) => p.status !== 'archived').length;
 
-    const analyticsMap: Record<string, {
-      headlineValue: string;
-      deltaDirection: string;
-      series: Record<string, unknown>;
-      subMetrics: Array<{ value: string; label: string; badge: string }> | null;
-    }> = {};
+    const sevenDaysAgoMs = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const recentProjects = allProjects.filter((p) => new Date(p.createdAt).getTime() >= sevenDaysAgoMs).length;
+    const recentUsers = allUsers.filter((u) => new Date(u.createdAt).getTime() >= sevenDaysAgoMs).length;
+    const recentDocs = allDocs.filter((d) => new Date(d.createdAt).getTime() >= sevenDaysAgoMs);
+    const recentBytes = recentDocs.reduce((acc, d) => acc + d.sizeBytes, 0);
 
-    for (const s of snaps) {
-      analyticsMap[s.metricKey] = {
-        headlineValue: s.headlineValue,
-        deltaDirection: s.deltaDirection,
-        series: JSON.parse(s.seriesJson),
-        subMetrics: s.subMetricsJson ? JSON.parse(s.subMetricsJson) : null,
-      };
-    }
+    const pctDelta = (part: number, total: number) =>
+      total > 0 ? `${Math.round((part / total) * 100)}%` : '0%';
+
+    // Helper: build trailing N-day bar buckets normalized 0..100 from real timestamps
+    const buildDailySeries = (items: Array<{ date: Date | string; weight?: number }>, days: number) => {
+      const now = new Date();
+      const dayKeys: string[] = [];
+      const totals = new Map<string, number>();
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+        const key = d.toISOString().slice(0, 10);
+        dayKeys.push(key);
+        totals.set(key, 0);
+      }
+      for (const item of items) {
+        const key = new Date(item.date).toISOString().slice(0, 10);
+        if (totals.has(key)) {
+          totals.set(key, (totals.get(key) || 0) + (item.weight ?? 1));
+        }
+      }
+      const raw = dayKeys.map((k) => totals.get(k) || 0);
+      const maxVal = Math.max(0, ...raw);
+      const bars = raw.map((v) => (maxVal > 0 ? Math.round((v / maxVal) * 100) : 0));
+      return { dayKeys, raw, bars, maxVal };
+    };
+
+    // 1. Document Uploads (trailing 14 days from real documents.createdAt)
+    const uploadSeries = buildDailySeries(
+      allDocs.map((d) => ({ date: d.createdAt, weight: 1 })),
+      14,
+    );
+    const submittedOrApproved = approvedCount + pendingCount;
+    const uploadHeadlinePct = totalDocs > 0 ? (submittedOrApproved / totalDocs) * 100 : 0;
+
+    // 2. Data Processed (docs with AI summary or completed approval review)
+    const processedDocs = allDocs.filter(
+      (d) => Boolean(d.aiSummary?.trim()) || d.approvalStatus === 'approved' || d.approvalStatus === 'rejected',
+    );
+    const processedPct = totalDocs > 0 ? (processedDocs.length / totalDocs) * 100 : 0;
+    const processedSeries = buildDailySeries(
+      allDocs.map((d) => ({ date: d.createdAt, weight: d.sizeBytes })),
+      14,
+    );
+
+    // 3. Discrepancies (computed from real documents.discrepancyRate)
+    const parsedRates = allDocs.map((d) => {
+      const num = parseFloat(String(d.discrepancyRate || '0').replace('%', '').trim());
+      return Number.isFinite(num) ? Math.max(0, num) : 0;
+    });
+    const avgDiscrepancy =
+      parsedRates.length > 0 ? parsedRates.reduce((a, b) => a + b, 0) / parsedRates.length : 0;
+    const maxDiscrepancy = parsedRates.length > 0 ? Math.max(...parsedRates) : 0;
+    const minDiscrepancy = parsedRates.length > 0 ? Math.min(...parsedRates) : 0;
+    const discrepancyBars =
+      parsedRates.length > 0
+        ? parsedRates.slice(0, 14).map((r) => (maxDiscrepancy > 0 ? Math.round((r / maxDiscrepancy) * 100) : 0))
+        : new Array(14).fill(0);
+
+    // 4. On-Time Month Closures / Approval Completion (real documents & approvalEvents)
+    const approvalCompletionPct = totalDocs > 0 ? (approvedCount / totalDocs) * 100 : 0;
+    const closureSeries = buildDailySeries(
+      [
+        ...allDocs.map((d) => ({ date: d.createdAt, weight: 1 })),
+        ...allEvents.map((e) => ({ date: e.createdAt, weight: 1 })),
+      ],
+      20,
+    );
+    const redIndices: number[] = [];
+    const closurePins: Array<{ index: number; type: 'up' | 'down'; label: string }> = [];
+    closureSeries.dayKeys.forEach((dayKey, idx) => {
+      const dayEvents = allEvents.filter(
+        (e) => new Date(e.createdAt).toISOString().slice(0, 10) === dayKey,
+      );
+      const dayRejects = dayEvents.filter((e) => e.action === 'rejected').length;
+      const dayApproves = dayEvents.filter((e) => e.action === 'approved').length;
+      if (dayRejects > 0) {
+        redIndices.push(idx);
+        closurePins.push({ index: idx, type: 'down', label: `${dayRejects} rejected (${dayKey})` });
+      } else if (dayApproves > 0 && closurePins.length < 3) {
+        closurePins.push({ index: idx, type: 'up', label: `${dayApproves} approved (${dayKey})` });
+      }
+    });
+
+    // 5. Usage Rate (AI queries + audit trail activity across workspace)
+    const aiSummarizedCount = allDocs.filter((d) => Boolean(d.aiSummary?.trim())).length;
+    const aiCoveragePct = totalDocs > 0 ? Math.round((aiSummarizedCount / totalDocs) * 100) : 0;
+    const usageEngagementPct =
+      totalDocs > 0
+        ? Math.min(100, ((allEvents.length + allAiMsgs.length) / Math.max(1, totalDocs * 3)) * 100)
+        : 0;
+    const usageSeries = buildDailySeries(
+      [
+        ...allEvents.map((e) => ({ date: e.createdAt, weight: 1 })),
+        ...allAiMsgs.map((m) => ({ date: m.createdAt, weight: 1 })),
+      ],
+      20,
+    );
+
+    const analyticsMap = {
+      document_uploads: {
+        headlineValue: formatCommaPercent(uploadHeadlinePct),
+        deltaDirection: 'up',
+        series: {
+          minLabel: `${Math.min(...uploadSeries.raw)} docs/d`,
+          maxLabel: `${totalDocs} total`,
+          bars: uploadSeries.bars,
+        },
+        subMetrics: null,
+      },
+      data_processed: {
+        headlineValue: formatCommaPercent(processedPct),
+        deltaDirection: 'up',
+        series: {
+          minLabel: '0 B',
+          maxLabel: formatBytesLabel(totalBytes),
+          bars: processedSeries.bars,
+        },
+        subMetrics: null,
+      },
+      discrepancies: {
+        headlineValue: formatCommaPercent(avgDiscrepancy),
+        deltaDirection: avgDiscrepancy > 2 ? 'down' : 'up',
+        series: {
+          minLabel: `${minDiscrepancy.toFixed(2)}% min`,
+          maxLabel: `${maxDiscrepancy.toFixed(2)}% max`,
+          bars: discrepancyBars,
+        },
+        subMetrics: null,
+      },
+      month_closures: {
+        headlineValue: formatCommaPercent(approvalCompletionPct),
+        deltaDirection: rejectedCount > approvedCount ? 'down' : 'up',
+        series: {
+          bars: closureSeries.bars,
+          redIndices,
+          pins: closurePins.slice(0, 3),
+        },
+        subMetrics: [
+          { value: String(approvedCount), label: 'Approved', badge: 'up' as const },
+          { value: String(pendingCount), label: 'Pending', badge: 'warn' as const },
+          { value: String(rejectedCount), label: 'Rejected', badge: 'alert' as const },
+          { value: String(totalDocs), label: 'Total Docs', badge: 'up' as const },
+        ],
+      },
+      usage_rate: {
+        headlineValue: formatCommaPercent(usageEngagementPct),
+        deltaDirection: 'up',
+        series: {
+          bars: usageSeries.bars,
+          redIndices: [],
+          pins: [],
+        },
+        subMetrics: [
+          { value: `${aiCoveragePct}%`, label: 'AI Summarized', badge: 'up' as const },
+          { value: String(allEvents.length), label: 'Audit Events', badge: 'up' as const },
+          { value: String(allAiMsgs.length), label: 'AI Queries', badge: 'warn' as const },
+          { value: String(activeProjectsCount), label: 'Active Rooms', badge: 'up' as const },
+        ],
+      },
+    };
 
     return {
       kpis: {
-        activeProjects: BASELINE.projectsOffset + allProjects.length,
-        activeProjectsDelta: '12%',
-        totalUsers: BASELINE.usersOffset + allUsers.length,
-        totalUsersDelta: '8%',
-        totalDocuments: BASELINE.docsOffset + allDocs.length,
-        totalDocumentsDelta: '18%',
-        dataRoomSizeGb: BASELINE.sizeGbOffset + extraGb,
-        dataRoomSizeDelta: '11%',
-        pendingReviews: BASELINE.pendingOffset + pendingCount,
+        activeProjects: activeProjectsCount,
+        activeProjectsDelta: pctDelta(recentProjects, allProjects.length),
+        totalUsers: allUsers.length,
+        totalUsersDelta: pctDelta(recentUsers, allUsers.length),
+        totalDocuments: totalDocs,
+        totalDocumentsDelta: pctDelta(recentDocs.length, totalDocs),
+        dataRoomSizeGb: Number((totalBytes / (1024 * 1024 * 1024)).toFixed(2)),
+        dataRoomSizeBytes: totalBytes,
+        dataRoomSizeFormatted: formatBytesLabel(totalBytes),
+        dataRoomSizeDelta: pctDelta(recentBytes, totalBytes),
+        pendingReviews: pendingCount,
       },
       analytics: analyticsMap,
       storageBackend: RustFSStorageService.getStorageMode(),

@@ -29,11 +29,26 @@ function MiniBarChart({
 }) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
+  if (!bars || bars.length === 0) {
+    return (
+      <div className="mt-4">
+        <div className="h-14 rounded-xl bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center text-[11px] text-slate-400">
+          Waiting for database activity
+        </div>
+        <div className="mt-2 flex items-center justify-between text-[10.5px] text-slate-400 tabular-nums">
+          <span>{minLabel || '—'}</span>
+          <span>{maxLabel || '—'}</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-4">
       <div className="relative h-14 flex items-end justify-between gap-[3px]">
         {bars.map((val, idx) => {
           const isHovered = hoveredIdx === idx;
+          const barHeight = val <= 0 ? '4px' : `${Math.max(10, val)}%`;
           return (
             <div
               key={idx}
@@ -49,9 +64,9 @@ function MiniBarChart({
               <div
                 className="w-[2.5px] sm:w-[3px] rounded-t-full transition-opacity duration-150"
                 style={{
-                  height: `${Math.max(14, val)}%`,
-                  backgroundColor: color,
-                  opacity: isHovered ? 1 : idx > 14 ? 0.45 : 0.9,
+                  height: barHeight,
+                  backgroundColor: val <= 0 ? '#E2E8F0' : color,
+                  opacity: isHovered ? 1 : val <= 0 ? 0.8 : idx > Math.floor(bars.length * 0.7) ? 0.65 : 0.92,
                 }}
               />
             </div>
@@ -77,15 +92,24 @@ function AccountMetricsBarChart({
 }) {
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
+  if (!bars || bars.length === 0) {
+    return (
+      <div className="mt-6 h-20 rounded-xl bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center text-[11px] text-slate-400">
+        No database events recorded yet
+      </div>
+    );
+  }
+
   return (
     <div className="relative mt-6 h-20 flex items-end justify-between gap-[2.5px] sm:gap-[3px]">
       {bars.map((val, idx) => {
         const isRed = redIndices.includes(idx);
-        const isMuted = idx >= 20;
+        const isEmpty = val <= 0;
         const pin = pins.find((p) => p.index === idx);
         const isHovered = hoveredIdx === idx;
 
-        const barColor = isRed ? '#EF4444' : isMuted ? '#E5E7EB' : '#2563EB';
+        const barColor = isRed ? '#EF4444' : isEmpty ? '#E5E7EB' : '#2563EB';
+        const barHeight = isEmpty ? '4px' : `${Math.max(10, val)}%`;
 
         return (
           <div
@@ -103,7 +127,7 @@ function AccountMetricsBarChart({
                     : 'bg-[#EF4444] text-white'
                 }`}
                 style={{
-                  bottom: `calc(${Math.max(12, val)}% + 5px)`,
+                  bottom: `calc(${isEmpty ? 6 : Math.max(10, val)}% + 5px)`,
                 }}
               >
                 {pin.type === 'up' ? (
@@ -123,9 +147,9 @@ function AccountMetricsBarChart({
             <div
               className="w-[2.5px] sm:w-[3px] rounded-t-full transition-opacity duration-150"
               style={{
-                height: `${Math.max(12, val)}%`,
+                height: barHeight,
                 backgroundColor: barColor,
-                opacity: isHovered ? 1 : isMuted ? 0.75 : 0.92,
+                opacity: isHovered ? 1 : isEmpty ? 0.75 : 0.92,
               }}
             />
           </div>
@@ -157,82 +181,22 @@ function SubMetricBadge({ badge }: { badge: 'up' | 'alert' | 'warn' }) {
   );
 }
 
+const EMPTY_CARD: AnalyticsCardData = {
+  headlineValue: '0,00%',
+  deltaDirection: 'up',
+  series: { minLabel: '0', maxLabel: '0', bars: [] },
+  subMetrics: [],
+};
+
 export const AnalyticsSection: React.FC<AnalyticsSectionProps> = ({
   analytics,
   onOpenWorkspace,
 }) => {
-  const uploads = analytics.document_uploads || {
-    headlineValue: '72,52%',
-    deltaDirection: 'up',
-    series: {
-      minLabel: '15.6K',
-      maxLabel: '17K',
-      bars: [22, 34, 42, 38, 52, 64, 72, 85, 78, 92, 80, 68, 76, 62, 54, 48, 58, 46, 36, 42, 34, 28],
-    },
-    subMetrics: null,
-  };
-
-  const processed = analytics.data_processed || {
-    headlineValue: '61,23%',
-    deltaDirection: 'up',
-    series: {
-      minLabel: '183 GB',
-      maxLabel: '240 GB',
-      bars: [18, 28, 36, 48, 58, 74, 88, 92, 84, 76, 82, 74, 68, 62, 56, 48, 42, 38, 32, 26, 22, 18],
-    },
-    subMetrics: null,
-  };
-
-  const discrepancies = analytics.discrepancies || {
-    headlineValue: '13,78%',
-    deltaDirection: 'down',
-    series: {
-      minLabel: '2.9K',
-      maxLabel: '11.5K',
-      bars: [32, 46, 58, 76, 84, 92, 82, 74, 68, 72, 64, 58, 54, 46, 40, 34, 30, 26, 22, 18, 16, 14],
-    },
-    subMetrics: null,
-  };
-
-  const closures = analytics.month_closures || {
-    headlineValue: '77,24%',
-    deltaDirection: 'up',
-    series: {
-      bars: [10, 18, 32, 16, 42, 26, 44, 58, 76, 62, 34, 88, 66, 48, 36, 68, 84, 94, 82, 72, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12],
-      redIndices: [8, 11],
-      pins: [
-        { index: 4, type: 'up', label: 'Q1 Timely +12%' },
-        { index: 11, type: 'down', label: 'Variance spike -4.2%' },
-        { index: 19, type: 'up', label: 'Close velocity +18%' },
-      ],
-    },
-    subMetrics: [
-      { value: '88', label: 'Closed', badge: 'up' },
-      { value: '19', label: 'Open', badge: 'alert' },
-      { value: '19/5', label: 'Timely', badge: 'warn' },
-      { value: '84/0', label: 'On Time', badge: 'up' },
-    ],
-  };
-
-  const usage = analytics.usage_rate || {
-    headlineValue: '46,36%',
-    deltaDirection: 'up',
-    series: {
-      bars: [12, 22, 18, 28, 14, 34, 24, 46, 62, 84, 52, 74, 42, 24, 38, 48, 66, 78, 92, 68, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12],
-      redIndices: [9, 13],
-      pins: [
-        { index: 6, type: 'up', label: 'Sync throughput +14%' },
-        { index: 13, type: 'down', label: 'Retry threshold' },
-        { index: 19, type: 'up', label: 'Retrieval peak +21%' },
-      ],
-    },
-    subMetrics: [
-      { value: '56%', label: 'Syncs Accounts', badge: 'up' },
-      { value: '11%', label: 'Auto Send', badge: 'alert' },
-      { value: '32%', label: 'Manual Send', badge: 'warn' },
-      { value: '74%', label: 'Retrieval', badge: 'up' },
-    ],
-  };
+  const uploads = analytics.document_uploads || EMPTY_CARD;
+  const processed = analytics.data_processed || EMPTY_CARD;
+  const discrepancies = analytics.discrepancies || EMPTY_CARD;
+  const closures = analytics.month_closures || EMPTY_CARD;
+  const usage = analytics.usage_rate || EMPTY_CARD;
 
   return (
     <div className="flex flex-col gap-4">
