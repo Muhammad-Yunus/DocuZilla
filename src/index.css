@@ -1,0 +1,77 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  body {
+    background-color: #F3F6FB;
+    color: #0F172A;
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+}
+
+.font-mono-tabular {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Custom Hero Gradient matching DocuZilla reference */
+.docuzilla-hero-bg {
+  background:
+    radial-gradient(circle at 63% 76%, rgba(164, 198, 255, 0.42) 0%, rgba(114, 152, 248, 0.16) 28%, rgba(64, 102, 244, 0) 56%),
+    radial-gradient(circle at 18% 12%, rgba(92, 134, 255, 0.45) 0%, rgba(58, 98, 244, 0) 48%),
+    linear-gradient(116deg, #355FF5 0%, #4A72F4 38%, #6482EF 74%, #7E93ED 100%);
+}
+
+/* Inverted concave corner scoops for the elevated center KPI tab */
+.active-kpi-tab {
+  position: relative;
+  background: linear-gradient(180deg, #FFFFFF 0%, #F9FBFE 58%, #F3F6FB 100%);
+}
+
+@media (min-width: 1024px) {
+  .active-kpi-tab::before,
+  .active-kpi-tab::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    width: 24px;
+    height: 24px;
+    pointer-events: none;
+  }
+
+  .active-kpi-tab::before {
+    left: -24px;
+    background: radial-gradient(circle at 0 0, transparent 24px, #F3F6FB 24.5px);
+  }
+
+  .active-kpi-tab::after {
+    right: -24px;
+    background: radial-gradient(circle at 100% 0, transparent 24px, #F3F6FB 24.5px);
+  }
+}
+
+/* Clean subtle scrollbar for AI chat and drawers */
+.thin-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.6);
+}

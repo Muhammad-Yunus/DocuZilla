@@ -1,0 +1,8 @@
+{
+  "name": "DocuZilla",
+  "description": "DocuZilla is an enterprise data room, financial audit analytics platform, 1-level document approval workflow, and Gemini-powered PDF AI assistant.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
